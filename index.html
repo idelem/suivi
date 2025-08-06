@@ -110,7 +110,6 @@
 
         .note-content {
             flex: 1;
-            margin-right: 10px;
             line-height: 1.4;
             word-wrap: break-word;
         }
@@ -266,7 +265,7 @@
     </div>
 
     <script>
-        // Data storage (in-memory instead of localStorage for Claude.ai compatibility)
+        // Data storage (now using localStorage)
         let notes = [];
         let nextId = 1;
         let selectedNotes = new Set();
@@ -274,6 +273,19 @@
         let viewHistory = [];
         let currentNoteId = null;
         let editingNoteId = null;
+
+        // --- LocalStorage helpers ---
+        function saveToStorage() {
+            localStorage.setItem('suivi_notes', JSON.stringify(notes));
+            localStorage.setItem('suivi_nextId', nextId);
+        }
+
+        function loadFromStorage() {
+            const notesStr = localStorage.getItem('suivi_notes');
+            const nextIdStr = localStorage.getItem('suivi_nextId');
+            notes = notesStr ? JSON.parse(notesStr) : [];
+            nextId = nextIdStr ? parseInt(nextIdStr, 10) : 1;
+        }
 
         // Note structure: { id, content, retweets: [noteId], retweetedBy: [noteId] }
 
@@ -294,6 +306,7 @@
             });
 
             notes.push(note);
+            saveToStorage();
             return note;
         }
 
@@ -440,6 +453,7 @@
             const note = notes.find(n => n.id === noteId);
             if (note && newContent.trim()) {
                 note.content = newContent.trim();
+                saveToStorage();
             }
             cancelEdit();
         }
@@ -456,7 +470,7 @@
             createNote(content, retweets);
             clearSelection();
             clearComposeInputs();
-            
+
             // Always re-render all timelines to ensure consistency
             renderTimeline('mainTimeline');
             if (currentView === 'left' && currentNoteId) {
@@ -623,14 +637,16 @@
             });
         });
 
-        // Initialize with some sample data
+        // Initialize with some sample data or load from storage
         function initializeApp() {
-            createNote("This is the first note!");
-            createNote("Another independent note.");
-            createNote("This note retweets the first one.", [1]);
-            createNote("This also retweets the first note.", [1]);
-            createNote("This retweets the third note.", [3]);
-
+            loadFromStorage();
+            if (notes.length === 0) {
+                createNote("This is the first note!");
+                createNote("Another independent note.");
+                createNote("This note retweets the first one.", [1]);
+                createNote("This also retweets the first note.", [1]);
+                createNote("This retweets the third note.", [3]);
+            }
             renderTimeline('mainTimeline');
             slideToView('main');
             updateSelectedCounts();

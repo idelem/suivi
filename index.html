@@ -232,6 +232,18 @@
         .repost-thumb:hover {
             background: #d0e7ff;
         }
+
+        .delete-btn {
+            background: #ffeded;
+            border: 1px solid #ff4a4a;
+            color: #c00;
+            font-weight: bold;
+        }
+        .delete-btn:hover {
+            background: #ffcccc;
+            border-color: #ff0000;
+            color: #900;
+        }
     </style>
 </head>
 <body>
@@ -241,6 +253,7 @@
             <div class="header">
                 <button class="home-btn" id="mainHomeBtn" style="visibility: hidden;">🏠</button>
                 <span class="view-title">Timeline</span>
+                <button class="compose-btn delete-btn" id="mainDeleteBtn" style="display:none; margin-left:auto;">Delete</button>
             </div>
             <div class="timeline" id="mainTimeline"></div>
             <div class="compose-area">
@@ -260,6 +273,7 @@
                 <button class="home-btn" id="rightHomeBtn">🏠</button>
                 <span class="view-title">Retweeted by</span>
                 <span class="retweet-count" id="retweetCount">0</span>
+                <button class="compose-btn delete-btn" id="rightDeleteBtn" style="display:none; margin-left:auto;">Delete</button>
             </div>
             <div class="timeline" id="rightTimeline"></div>
             <div class="compose-area">
@@ -596,6 +610,10 @@
             const text = count === 1 ? '1 selected' : `${count} selected`;
             document.getElementById('mainSelectedCount').textContent = text;
             document.getElementById('rightSelectedCount').textContent = text;
+
+            // Show/hide delete buttons in headers
+            document.getElementById('mainDeleteBtn').style.display = count > 0 ? '' : 'none';
+            document.getElementById('rightDeleteBtn').style.display = count > 0 ? '' : 'none';
         }
 
         function updateUI() {
@@ -609,6 +627,34 @@
                 }
             }
             updateSelectedCounts();
+        }
+
+        function deleteSelectedNotes() {
+            if (selectedNotes.size === 0) return;
+            if (!confirm(`Delete ${selectedNotes.size} selected note(s)? This cannot be undone.`)) return;
+
+            // Remove selected notes and update retweets/retweetedBy references
+            notes = notes.filter(note => {
+                if (!selectedNotes.has(note.id)) return true;
+                // Remove this note from retweetedBy of others
+                note.retweets.forEach(retweetId => {
+                    const retweetedNote = notes.find(n => n.id === retweetId);
+                    if (retweetedNote) {
+                        retweetedNote.retweetedBy = retweetedNote.retweetedBy.filter(id => id !== note.id);
+                    }
+                });
+                // Remove this note from retweets of others
+                note.retweetedBy.forEach(retweetedById => {
+                    const retweeter = notes.find(n => n.id === retweetedById);
+                    if (retweeter) {
+                        retweeter.retweets = retweeter.retweets.filter(id => id !== note.id);
+                    }
+                });
+                return false;
+            });
+            selectedNotes.clear();
+            saveToStorage();
+            updateUI();
         }
 
         // Event listeners
@@ -651,6 +697,10 @@
                 }
             });
         });
+
+        // Add event listeners for delete buttons
+        document.getElementById('mainDeleteBtn').addEventListener('click', deleteSelectedNotes);
+        document.getElementById('rightDeleteBtn').addEventListener('click', deleteSelectedNotes);
 
         // Initialize with some sample data or load from storage
         function initializeApp() {

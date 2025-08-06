@@ -31,6 +31,7 @@
             display: flex;
             flex-direction: column;
             border-right: 1px solid #d0d0d0;
+            overflow: hidden; /* Add this */
         }
 
         .header {
@@ -144,8 +145,13 @@
 
         .compose-area {
             border-top: 1px solid #d0d0d0;
-            padding: 10px;
             background: #f8f8f8;
+            padding: 10px;
+            position: sticky;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            z-index: 10;
         }
 
         .compose-input {
@@ -243,6 +249,13 @@
             background: #ffcccc;
             border-color: #ff0000;
             color: #900;
+        }
+
+        /* Responsive: ensure compose-area is always visible on mobile */
+        @media (max-width: 600px) {
+            .compose-area {
+                padding-bottom: env(safe-area-inset-bottom, 10px);
+            }
         }
     </style>
 </head>

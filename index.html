@@ -205,28 +205,37 @@
             font-size: 12px;
             color: #666;
         }
+
+        /* Add thumbnail styles */
+        .repost-thumbnails {
+            display: flex;
+            gap: 4px;
+            margin-top: 6px;
+            margin-bottom: 2px;
+        }
+        .repost-thumb {
+            width: 32px;
+            height: 32px;
+            background: #e6f3ff;
+            border: 1px solid #4a9eff;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: #2e2e2e;
+            cursor: pointer;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .repost-thumb:hover {
+            background: #d0e7ff;
+        }
     </style>
 </head>
 <body>
     <div class="app-container" id="appContainer">
-        <!-- Left view: notes this note is retweeting -->
-        <div class="view">
-            <div class="header">
-                <button class="back-btn" id="leftBackBtn">←</button>
-                <button class="home-btn" id="leftHomeBtn">🏠</button>
-                <span class="view-title">Retweeting</span>
-            </div>
-            <div class="timeline" id="leftTimeline"></div>
-            <div class="compose-area">
-                <textarea class="compose-input" id="leftComposeInput" placeholder="Compose a new note..."></textarea>
-                <div class="compose-controls">
-                    <button class="compose-btn" id="leftComposeBtn">Post</button>
-                    <button class="compose-btn" id="leftClearBtn">Clear Selection</button>
-                    <span class="selected-count" id="leftSelectedCount">0 selected</span>
-                </div>
-            </div>
-        </div>
-
         <!-- Center view: main timeline -->
         <div class="view">
             <div class="header">
@@ -339,22 +348,48 @@
             editInput.value = note.content;
             editInput.style.display = editingNoteId === note.id ? 'block' : 'none';
 
+            // --- Repost thumbnails ---
+            let repostThumbs = null;
+            if (note.retweets && note.retweets.length > 0) {
+                repostThumbs = document.createElement('div');
+                repostThumbs.className = 'repost-thumbnails';
+                note.retweets.forEach(retweetId => {
+                    const repostNote = notes.find(n => n.id === retweetId);
+                    if (repostNote) {
+                        const thumb = document.createElement('div');
+                        thumb.className = 'repost-thumb';
+                        thumb.title = repostNote.content;
+                        // Show first 10 chars or note id
+                        thumb.textContent = repostNote.content.slice(0, 10) || `#${repostNote.id}`;
+                        thumb.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            // Scroll to the reposted note in the main timeline
+                            goHome();
+                            setTimeout(() => {
+                                const el = document.querySelector(`[data-note-id="${repostNote.id}"]`);
+                                if (el) {
+                                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    el.classList.add('selected');
+                                    setTimeout(() => el.classList.remove('selected'), 800);
+                                }
+                            }, 100);
+                        });
+                        repostThumbs.appendChild(thumb);
+                    }
+                });
+            }
+
             const navBtns = document.createElement('div');
             navBtns.className = 'note-nav';
 
-            const leftBtn = document.createElement('button');
-            leftBtn.className = 'nav-btn';
-            leftBtn.textContent = note.retweets.length.toString();
-            leftBtn.disabled = note.retweets.length === 0;
-            leftBtn.title = `${note.retweets.length} retweets`;
-
+            // Remove leftBtn (retweets navigation)
+            // Only keep rightBtn (retweetedBy navigation)
             const rightBtn = document.createElement('button');
             rightBtn.className = 'nav-btn';
             rightBtn.textContent = note.retweetedBy.length.toString();
             rightBtn.disabled = note.retweetedBy.length === 0;
             rightBtn.title = `Retweeted by ${note.retweetedBy.length}`;
 
-            navBtns.appendChild(leftBtn);
             navBtns.appendChild(rightBtn);
 
             // Event listeners
@@ -366,13 +401,6 @@
             content.addEventListener('click', (e) => {
                 e.stopPropagation();
                 startEditing(note.id);
-            });
-
-            leftBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (note.retweets.length > 0) {
-                    navigateToRetweets(note.id);
-                }
             });
 
             rightBtn.addEventListener('click', (e) => {
@@ -396,6 +424,7 @@
 
             noteEl.appendChild(selectDot);
             noteEl.appendChild(content);
+            if (repostThumbs) noteEl.appendChild(repostThumbs);
             noteEl.appendChild(editInput);
             noteEl.appendChild(navBtns);
 
@@ -553,21 +582,18 @@
             const container = document.getElementById('appContainer');
             let translateX;
             switch (view) {
-                case 'left': translateX = 0; break;
-                case 'main': translateX = -100; break;
-                case 'right': translateX = -200; break;
+                case 'main': translateX = 0; break;
+                case 'right': translateX = -100; break;
             }
             container.style.transform = `translateX(${translateX}vw)`;
 
-            // Update back button states
-            document.getElementById('leftBackBtn').disabled = viewHistory.length === 0;
+            // Update back button state
             document.getElementById('rightBackBtn').disabled = viewHistory.length === 0;
         }
 
         function updateSelectedCounts() {
             const count = selectedNotes.size;
             const text = count === 1 ? '1 selected' : `${count} selected`;
-            document.getElementById('leftSelectedCount').textContent = text;
             document.getElementById('mainSelectedCount').textContent = text;
             document.getElementById('rightSelectedCount').textContent = text;
         }
@@ -576,11 +602,6 @@
             // Re-render current timeline
             if (currentView === 'main') {
                 renderTimeline('mainTimeline');
-            } else if (currentView === 'left' && currentNoteId) {
-                const note = notes.find(n => n.id === currentNoteId);
-                if (note) {
-                    renderTimeline('leftTimeline', note.retweets);
-                }
             } else if (currentView === 'right' && currentNoteId) {
                 const note = notes.find(n => n.id === currentNoteId);
                 if (note) {
@@ -605,33 +626,27 @@
         document.getElementById('mainComposeBtn').addEventListener('click', () => {
             composeNote(document.getElementById('mainComposeInput').value, 'main');
         });
-        document.getElementById('leftComposeBtn').addEventListener('click', () => {
-            composeNote(document.getElementById('leftComposeInput').value, 'left');
-        });
         document.getElementById('rightComposeBtn').addEventListener('click', () => {
             composeNote(document.getElementById('rightComposeInput').value, 'right');
         });
 
         // Clear selection buttons
         document.getElementById('mainClearBtn').addEventListener('click', clearSelection);
-        document.getElementById('leftClearBtn').addEventListener('click', clearSelection);
         document.getElementById('rightClearBtn').addEventListener('click', clearSelection);
 
         // Back buttons
-        document.getElementById('leftBackBtn').addEventListener('click', goBack);
         document.getElementById('rightBackBtn').addEventListener('click', goBack);
 
         // Home buttons
-        document.getElementById('leftHomeBtn').addEventListener('click', goHome);
         document.getElementById('rightHomeBtn').addEventListener('click', goHome);
+        document.getElementById('mainHomeBtn').addEventListener('click', goHome);
 
         // Compose input enter handling
         document.querySelectorAll('.compose-input').forEach(input => {
             input.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && e.ctrlKey) {
                     e.preventDefault();
-                    const viewType = input.id.includes('main') ? 'main' : 
-                                   input.id.includes('left') ? 'left' : 'right';
+                    const viewType = input.id.includes('main') ? 'main' : 'right';
                     composeNote(input.value, viewType);
                 }
             });

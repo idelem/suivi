@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suivi</title>
+    <style>
+        /* Minimal CSS inspired by Emacs tao-theme */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            background: #fefefe;
+            color: #2e2e2e;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            width: 300vw;
+            height: 100vh;
+            transition: transform 0.3s ease;
+        }
+
+        .view {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #d0d0d0;
+        }
+
+        .header {
+            padding: 10px;
+            border-bottom: 1px solid #d0d0d0;
+            background: #f8f8f8;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .back-btn, .home-btn {
+            background: none;
+            border: 1px solid #ccc;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+        }
+
+        .back-btn:hover, .home-btn:hover {
+            background: #eee;
+        }
+
+        .back-btn:disabled, .home-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .retweet-count {
+            background: #e8e8e8;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+
+        .timeline {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .note {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 10px;
+            padding: 8px;
+            border: 1px solid #e0e0e0;
+            background: #fdfdfd;
+            cursor: pointer;
+        }
+
+        .note:hover {
+            background: #f5f5f5;
+        }
+
+        .note.selected {
+            background: #e6f3ff;
+            border-color: #4a9eff;
+        }
+
+        .select-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            border: 2px solid #ccc;
+            margin-right: 10px;
+            margin-top: 3px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .select-dot.selected {
+            background: #4a9eff;
+            border-color: #4a9eff;
+        }
+
+        .note-content {
+            flex: 1;
+            margin-right: 10px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .note-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex-shrink: 0;
+        }
+
+        .nav-btn {
+            width: 16px;
+            height: 16px;
+            border: 1px solid #ccc;
+            background: none;
+            cursor: pointer;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-btn:hover {
+            background: #eee;
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .compose-area {
+            border-top: 1px solid #d0d0d0;
+            padding: 10px;
+            background: #f8f8f8;
+        }
+
+        .compose-input {
+            width: 100%;
+            min-height: 60px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            font-family: inherit;
+            font-size: inherit;
+            resize: vertical;
+            margin-bottom: 8px;
+        }
+
+        .compose-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .compose-btn {
+            padding: 6px 12px;
+            border: 1px solid #ccc;
+            background: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+        }
+
+        .compose-btn:hover {
+            background: #eee;
+        }
+
+        .compose-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .selected-count {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .editing .note-content {
+            display: none;
+        }
+
+        .edit-input {
+            flex: 1;
+            margin-right: 10px;
+            padding: 4px;
+            border: 1px solid #4a9eff;
+            font-family: inherit;
+            font-size: inherit;
+        }
+
+        .view-title {
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container" id="appContainer">
+        <!-- Left view: notes this note is retweeting -->
+        <div class="view">
+            <div class="header">
+                <button class="back-btn" id="leftBackBtn">←</button>
+                <button class="home-btn" id="leftHomeBtn">🏠</button>
+                <span class="view-title">Retweeting</span>
+            </div>
+            <div class="timeline" id="leftTimeline"></div>
+            <div class="compose-area">
+                <textarea class="compose-input" id="leftComposeInput" placeholder="Compose a new note..."></textarea>
+                <div class="compose-controls">
+                    <button class="compose-btn" id="leftComposeBtn">Post</button>
+                    <button class="compose-btn" id="leftClearBtn">Clear Selection</button>
+                    <span class="selected-count" id="leftSelectedCount">0 selected</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center view: main timeline -->
+        <div class="view">
+            <div class="header">
+                <button class="home-btn" id="mainHomeBtn" style="visibility: hidden;">🏠</button>
+                <span class="view-title">Timeline</span>
+            </div>
+            <div class="timeline" id="mainTimeline"></div>
+            <div class="compose-area">
+                <textarea class="compose-input" id="mainComposeInput" placeholder="Compose a new note..."></textarea>
+                <div class="compose-controls">
+                    <button class="compose-btn" id="mainComposeBtn">Post</button>
+                    <button class="compose-btn" id="mainClearBtn">Clear Selection</button>
+                    <span class="selected-count" id="mainSelectedCount">0 selected</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right view: notes retweeting this note -->
+        <div class="view">
+            <div class="header">
+                <button class="back-btn" id="rightBackBtn">←</button>
+                <button class="home-btn" id="rightHomeBtn">🏠</button>
+                <span class="view-title">Retweeted by</span>
+                <span class="retweet-count" id="retweetCount">0</span>
+            </div>
+            <div class="timeline" id="rightTimeline"></div>
+            <div class="compose-area">
+                <textarea class="compose-input" id="rightComposeInput" placeholder="Compose a new note..."></textarea>
+                <div class="compose-controls">
+                    <button class="compose-btn" id="rightComposeBtn">Post</button>
+                    <button class="compose-btn" id="rightClearBtn">Clear Selection</button>
+                    <span class="selected-count" id="rightSelectedCount">0 selected</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data storage (in-memory instead of localStorage for Claude.ai compatibility)
+        let notes = [];
+        let nextId = 1;
+        let selectedNotes = new Set();
+        let currentView = 'main';
+        let viewHistory = [];
+        let currentNoteId = null;
+        let editingNoteId = null;
+
+        // Note structure: { id, content, retweets: [noteId], retweetedBy: [noteId] }
+
+        function createNote(content, retweets = []) {
+            const note = {
+                id: nextId++,
+                content: content.trim(),
+                retweets: [...retweets],
+                retweetedBy: []
+            };
+
+            // Update retweeted notes
+            retweets.forEach(retweetId => {
+                const retweetedNote = notes.find(n => n.id === retweetId);
+                if (retweetedNote) {
+                    retweetedNote.retweetedBy.push(note.id);
+                }
+            });
+
+            notes.push(note);
+            return note;
+        }
+
+        function renderNote(note, timelineId) {
+            const noteEl = document.createElement('div');
+            noteEl.className = 'note';
+            noteEl.dataset.noteId = note.id;
+
+            if (selectedNotes.has(note.id)) {
+                noteEl.classList.add('selected');
+            }
+
+            if (editingNoteId === note.id) {
+                noteEl.classList.add('editing');
+            }
+
+            const selectDot = document.createElement('div');
+            selectDot.className = 'select-dot';
+            if (selectedNotes.has(note.id)) {
+                selectDot.classList.add('selected');
+            }
+
+            const content = document.createElement('div');
+            content.className = 'note-content';
+            content.textContent = note.content;
+
+            const editInput = document.createElement('input');
+            editInput.type = 'text';
+            editInput.className = 'edit-input';
+            editInput.value = note.content;
+            editInput.style.display = editingNoteId === note.id ? 'block' : 'none';
+
+            const navBtns = document.createElement('div');
+            navBtns.className = 'note-nav';
+
+            const leftBtn = document.createElement('button');
+            leftBtn.className = 'nav-btn';
+            leftBtn.textContent = note.retweets.length.toString();
+            leftBtn.disabled = note.retweets.length === 0;
+            leftBtn.title = `${note.retweets.length} retweets`;
+
+            const rightBtn = document.createElement('button');
+            rightBtn.className = 'nav-btn';
+            rightBtn.textContent = note.retweetedBy.length.toString();
+            rightBtn.disabled = note.retweetedBy.length === 0;
+            rightBtn.title = `Retweeted by ${note.retweetedBy.length}`;
+
+            navBtns.appendChild(leftBtn);
+            navBtns.appendChild(rightBtn);
+
+            // Event listeners
+            selectDot.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleSelection(note.id);
+            });
+
+            content.addEventListener('click', (e) => {
+                e.stopPropagation();
+                startEditing(note.id);
+            });
+
+            leftBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (note.retweets.length > 0) {
+                    navigateToRetweets(note.id);
+                }
+            });
+
+            rightBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (note.retweetedBy.length > 0) {
+                    navigateToRetweetedBy(note.id);
+                }
+            });
+
+            editInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    saveEdit(note.id, editInput.value);
+                } else if (e.key === 'Escape') {
+                    cancelEdit();
+                }
+            });
+
+            editInput.addEventListener('blur', () => {
+                saveEdit(note.id, editInput.value);
+            });
+
+            noteEl.appendChild(selectDot);
+            noteEl.appendChild(content);
+            noteEl.appendChild(editInput);
+            noteEl.appendChild(navBtns);
+
+            return noteEl;
+        }
+
+        function renderTimeline(timelineId, noteIds = null) {
+            const timeline = document.getElementById(timelineId);
+            timeline.innerHTML = '';
+
+            let notesToShow;
+            if (noteIds) {
+                notesToShow = noteIds.map(id => notes.find(n => n.id === id)).filter(n => n);
+            } else {
+                // Show all notes in main timeline
+                notesToShow = [...notes];
+            }
+
+            // Sort by ID (newest first)
+            notesToShow.sort((a, b) => b.id - a.id);
+
+            notesToShow.forEach(note => {
+                timeline.appendChild(renderNote(note, timelineId));
+            });
+        }
+
+        function toggleSelection(noteId) {
+            if (selectedNotes.has(noteId)) {
+                selectedNotes.delete(noteId);
+            } else {
+                selectedNotes.add(noteId);
+            }
+            updateUI();
+        }
+
+        function clearSelection() {
+            selectedNotes.clear();
+            updateUI();
+        }
+
+        function startEditing(noteId) {
+            editingNoteId = noteId;
+            updateUI();
+            // Focus the edit input
+            setTimeout(() => {
+                const editInput = document.querySelector(`[data-note-id="${noteId}"] .edit-input`);
+                if (editInput) {
+                    editInput.focus();
+                    editInput.select();
+                }
+            }, 0);
+        }
+
+        function saveEdit(noteId, newContent) {
+            const note = notes.find(n => n.id === noteId);
+            if (note && newContent.trim()) {
+                note.content = newContent.trim();
+            }
+            cancelEdit();
+        }
+
+        function cancelEdit() {
+            editingNoteId = null;
+            updateUI();
+        }
+
+        function composeNote(content, viewType) {
+            if (!content.trim()) return;
+
+            const retweets = Array.from(selectedNotes);
+            createNote(content, retweets);
+            clearSelection();
+            clearComposeInputs();
+            
+            // Always re-render all timelines to ensure consistency
+            renderTimeline('mainTimeline');
+            if (currentView === 'left' && currentNoteId) {
+                const note = notes.find(n => n.id === currentNoteId);
+                if (note) {
+                    renderTimeline('leftTimeline', note.retweets);
+                }
+            } else if (currentView === 'right' && currentNoteId) {
+                const note = notes.find(n => n.id === currentNoteId);
+                if (note) {
+                    renderTimeline('rightTimeline', note.retweetedBy);
+                }
+            }
+            updateSelectedCounts();
+        }
+
+        function clearComposeInputs() {
+            document.querySelectorAll('.compose-input').forEach(input => {
+                input.value = '';
+            });
+        }
+
+        function navigateToRetweets(noteId) {
+            const note = notes.find(n => n.id === noteId);
+            if (!note || note.retweets.length === 0) return;
+
+            viewHistory.push({ view: currentView, noteId: currentNoteId });
+            currentView = 'left';
+            currentNoteId = noteId;
+            slideToView('left');
+            renderTimeline('leftTimeline', note.retweets);
+        }
+
+        function navigateToRetweetedBy(noteId) {
+            const note = notes.find(n => n.id === noteId);
+            if (!note || note.retweetedBy.length === 0) return;
+
+            viewHistory.push({ view: currentView, noteId: currentNoteId });
+            currentView = 'right';
+            currentNoteId = noteId;
+            slideToView('right');
+            renderTimeline('rightTimeline', note.retweetedBy);
+            document.getElementById('retweetCount').textContent = note.retweetedBy.length;
+        }
+
+        function goBack() {
+            if (viewHistory.length === 0) return;
+
+            const previous = viewHistory.pop();
+            currentView = previous.view;
+            currentNoteId = previous.noteId;
+            slideToView(currentView);
+
+            // Re-render the timeline we're going back to
+            if (currentView === 'main') {
+                renderTimeline('mainTimeline');
+            } else if (currentView === 'left' && currentNoteId) {
+                const note = notes.find(n => n.id === currentNoteId);
+                if (note) {
+                    renderTimeline('leftTimeline', note.retweets);
+                }
+            } else if (currentView === 'right' && currentNoteId) {
+                const note = notes.find(n => n.id === currentNoteId);
+                if (note) {
+                    renderTimeline('rightTimeline', note.retweetedBy);
+                    document.getElementById('retweetCount').textContent = note.retweetedBy.length;
+                }
+            }
+        }
+
+        function goHome() {
+            viewHistory = [];
+            currentView = 'main';
+            currentNoteId = null;
+            slideToView('main');
+            renderTimeline('mainTimeline');
+        }
+
+        function slideToView(view) {
+            const container = document.getElementById('appContainer');
+            let translateX;
+            switch (view) {
+                case 'left': translateX = 0; break;
+                case 'main': translateX = -100; break;
+                case 'right': translateX = -200; break;
+            }
+            container.style.transform = `translateX(${translateX}vw)`;
+
+            // Update back button states
+            document.getElementById('leftBackBtn').disabled = viewHistory.length === 0;
+            document.getElementById('rightBackBtn').disabled = viewHistory.length === 0;
+        }
+
+        function updateSelectedCounts() {
+            const count = selectedNotes.size;
+            const text = count === 1 ? '1 selected' : `${count} selected`;
+            document.getElementById('leftSelectedCount').textContent = text;
+            document.getElementById('mainSelectedCount').textContent = text;
+            document.getElementById('rightSelectedCount').textContent = text;
+        }
+
+        function updateUI() {
+            // Re-render current timeline
+            if (currentView === 'main') {
+                renderTimeline('mainTimeline');
+            } else if (currentView === 'left' && currentNoteId) {
+                const note = notes.find(n => n.id === currentNoteId);
+                if (note) {
+                    renderTimeline('leftTimeline', note.retweets);
+                }
+            } else if (currentView === 'right' && currentNoteId) {
+                const note = notes.find(n => n.id === currentNoteId);
+                if (note) {
+                    renderTimeline('rightTimeline', note.retweetedBy);
+                }
+            }
+            updateSelectedCounts();
+        }
+
+        // Event listeners
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (editingNoteId) {
+                    cancelEdit();
+                } else {
+                    clearSelection();
+                }
+            }
+        });
+
+        // Compose buttons
+        document.getElementById('mainComposeBtn').addEventListener('click', () => {
+            composeNote(document.getElementById('mainComposeInput').value, 'main');
+        });
+        document.getElementById('leftComposeBtn').addEventListener('click', () => {
+            composeNote(document.getElementById('leftComposeInput').value, 'left');
+        });
+        document.getElementById('rightComposeBtn').addEventListener('click', () => {
+            composeNote(document.getElementById('rightComposeInput').value, 'right');
+        });
+
+        // Clear selection buttons
+        document.getElementById('mainClearBtn').addEventListener('click', clearSelection);
+        document.getElementById('leftClearBtn').addEventListener('click', clearSelection);
+        document.getElementById('rightClearBtn').addEventListener('click', clearSelection);
+
+        // Back buttons
+        document.getElementById('leftBackBtn').addEventListener('click', goBack);
+        document.getElementById('rightBackBtn').addEventListener('click', goBack);
+
+        // Home buttons
+        document.getElementById('leftHomeBtn').addEventListener('click', goHome);
+        document.getElementById('rightHomeBtn').addEventListener('click', goHome);
+
+        // Compose input enter handling
+        document.querySelectorAll('.compose-input').forEach(input => {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    e.preventDefault();
+                    const viewType = input.id.includes('main') ? 'main' : 
+                                   input.id.includes('left') ? 'left' : 'right';
+                    composeNote(input.value, viewType);
+                }
+            });
+        });
+
+        // Initialize with some sample data
+        function initializeApp() {
+            createNote("This is the first note!");
+            createNote("Another independent note.");
+            createNote("This note retweets the first one.", [1]);
+            createNote("This also retweets the first note.", [1]);
+            createNote("This retweets the third note.", [3]);
+
+            renderTimeline('mainTimeline');
+            slideToView('main');
+            updateSelectedCounts();
+        }
+
+        initializeApp();
+    </script>
+</body>
+</html>

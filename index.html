@@ -499,7 +499,25 @@
             // Sort by ID (newest first)
             notesToShow.sort((a, b) => b.id - a.id);
 
+            // rightTimeline: 顶部单独显示当前 post 作为提示
+            if (timelineId === 'rightTimeline' && currentNoteId) {
+                const currentNote = notes.find(n => n.id === currentNoteId);
+                if (currentNote) {
+                    const hintBox = document.createElement('div');
+                    hintBox.className = 'retweeted-hint';
+                    hintBox.innerHTML = `
+                        <div style="font-size:12px;color:#888;margin-bottom:4px;">Reposts of:</div>
+                        <div class="note hint-note" style="background:#f3faff;border-color:#4a9eff;">
+                            <div class="note-content">${currentNote.content}</div>
+                        </div>
+                    `;
+                    timeline.appendChild(hintBox);
+                }
+            }
+
             notesToShow.forEach(note => {
+                // rightTimeline: 不重复渲染当前 post
+                if (timelineId === 'rightTimeline' && currentNoteId && note.id === currentNoteId) return;
                 timeline.appendChild(renderNote(note, timelineId));
             });
         }
@@ -617,9 +635,15 @@
             viewHistory.push({ view: currentView, noteId: currentNoteId });
             currentView = 'right';
             currentNoteId = noteId;
+
+            // 自动选中当前 post
+            selectedNotes.clear();
+            selectedNotes.add(noteId);
+
             slideToView('right');
             renderTimeline('rightTimeline', note.retweetedBy);
             document.getElementById('retweetCount').textContent = note.retweetedBy.length;
+            updateSelectedCounts();
         }
 
         function goBack() {

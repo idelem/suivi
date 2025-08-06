@@ -268,6 +268,9 @@
                 <span class="view-title">Timeline</span>
                 <button class="compose-btn delete-btn" id="mainDeleteBtn" style="display:none; margin-left:auto;">Delete</button>
             </div>
+            <div class="search-area" style="padding:10px; border-bottom:1px solid #eee;">
+                <input type="text" id="mainSearchInput" class="compose-input" placeholder="Search notes..." style="min-height:32px; margin-bottom:0;">
+            </div>
             <div class="timeline" id="mainTimeline"></div>
             <div class="compose-area">
                 <textarea class="compose-input" id="mainComposeInput" placeholder="Compose a new note..."></textarea>
@@ -458,6 +461,24 @@
             return noteEl;
         }
 
+        let searchKeyword = "";
+
+        // --- Search/filter logic ---
+        const searchInput = document.getElementById('mainSearchInput');
+        searchInput.addEventListener('input', function () {
+            searchKeyword = this.value.trim();
+            renderTimeline('mainTimeline');
+        });
+        searchInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                this.value = '';
+                searchKeyword = '';
+                renderTimeline('mainTimeline');
+                this.blur();
+            }
+        });
+
+        // --- Modify renderTimeline to filter by search ---
         function renderTimeline(timelineId, noteIds = null) {
             const timeline = document.getElementById(timelineId);
             timeline.innerHTML = '';
@@ -466,8 +487,13 @@
             if (noteIds) {
                 notesToShow = noteIds.map(id => notes.find(n => n.id === id)).filter(n => n);
             } else {
-                // Show all notes in main timeline
                 notesToShow = [...notes];
+            }
+
+            // Filter by search keyword if present
+            if (timelineId === 'mainTimeline' && searchKeyword) {
+                const kw = searchKeyword.toLowerCase();
+                notesToShow = notesToShow.filter(note => note.content.toLowerCase().includes(kw));
             }
 
             // Sort by ID (newest first)
@@ -476,6 +502,34 @@
             notesToShow.forEach(note => {
                 timeline.appendChild(renderNote(note, timelineId));
             });
+        }
+
+        // Optional: clear search when switching views or after posting
+        function clearSearch() {
+            searchInput.value = '';
+            searchKeyword = '';
+            renderTimeline('mainTimeline');
+        }
+
+        // Example: clear search after posting a note
+        function composeNote(content, viewType) {
+            if (!content.trim()) return;
+
+            const retweets = Array.from(selectedNotes);
+            createNote(content, retweets);
+            clearSelection();
+            clearComposeInputs();
+
+            // Always re-render all timelines to ensure consistency
+            renderTimeline('mainTimeline');
+            if (currentView === 'right' && currentNoteId) {
+                const note = notes.find(n => n.id === currentNoteId);
+                if (note) {
+                    renderTimeline('rightTimeline', note.retweetedBy);
+                }
+            }
+            updateSelectedCounts();
+            clearSearch(); // clear search after posting
         }
 
         function toggleSelection(noteId) {
@@ -529,18 +583,14 @@
 
             // Always re-render all timelines to ensure consistency
             renderTimeline('mainTimeline');
-            if (currentView === 'left' && currentNoteId) {
-                const note = notes.find(n => n.id === currentNoteId);
-                if (note) {
-                    renderTimeline('leftTimeline', note.retweets);
-                }
-            } else if (currentView === 'right' && currentNoteId) {
+            if (currentView === 'right' && currentNoteId) {
                 const note = notes.find(n => n.id === currentNoteId);
                 if (note) {
                     renderTimeline('rightTimeline', note.retweetedBy);
                 }
             }
             updateSelectedCounts();
+            clearSearch(); // clear search after posting
         }
 
         function clearComposeInputs() {
